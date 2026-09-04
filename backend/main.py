@@ -3,7 +3,6 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 import shutil
 
-
 from backend.ocr import extract_text
 from backend.validator import extract_fields, validate_fields
 from backend.tampering import detect_tampering
@@ -11,13 +10,7 @@ from backend.face_verification import detect_face
 from backend.face_matching import match_faces
 
 
-# ============================================================
-# TESSERACT CONFIGURATION
-# ============================================================
 
-pytesseract.pytesseract.tesseract_cmd = (
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-)
 
 
 # ============================================================

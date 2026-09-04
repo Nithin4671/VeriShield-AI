@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>VeriShield AI</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .header h1 {
+            margin-bottom: 8px;
+            font-size: 36px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 16px;
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .upload-card {
+            background: white;
+            border-radius: 14px;
+            padding: 25px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .upload-card h2 {
+            margin-top: 0;
+            font-size: 20px;
+        }
+
+        .upload-card p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            margin-top: 15px;
+            padding: 12px;
+            border: 1px dashed #9ca3af;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .analyze-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        button {
+            background: #111827;
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 9px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #374151;
+        }
+
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 20px;
+            color: #6b7280;
+        }
+
+        #result {
+            display: none;
+        }
+
+        .result-header {
+            background: white;
+            padding: 25px;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .status {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .risk-score {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .section {
+            background: white;
+            padding: 25px;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+
+        .section h3 {
+            margin-top: 0;
+            font-size: 20px;
+        }
+
+        .risk-factor {
+            padding: 10px 12px;
+            margin: 8px 0;
+            background: #fff7ed;
+            border-radius: 8px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .detail {
+            background: #f9fafb;
+            padding: 14px;
+            border-radius: 8px;
+        }
+
+        .detail strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #374151;
+        }
+
+        .validation-ok {
+            color: #047857;
+            font-weight: bold;
+        }
+
+        .tampering-box {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 9px;
+        }
+
+        .face-match-success {
+            background: #ecfdf5;
+            border: 1px solid #86efac;
+            border-radius: 10px;
+            padding: 18px;
+            color: #047857;
+        }
+
+        .face-match-warning {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            border-radius: 10px;
+            padding: 18px;
+            color: #c2410c;
+        }
+
+        .face-match-neutral {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 18px;
+            color: #374151;
+        }
+
+        .match-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .match-score {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+
+        .score-bar {
+            width: 100%;
+            height: 10px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: #374151;
+            border-radius: 10px;
+        }
+
+        details {
+            margin-top: 10px;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #111827;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 700px) {
+
+            .upload-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                margin: 20px auto;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+    <!-- HEADER -->
+
+    <div class="header">
+
+        <h1>🛡️ VeriShield AI</h1>
+
+        <p>
+            AI-Based Fake Identity & Document Screening System
+        </p>
+
+    </div>
+
+
+    <!-- UPLOADS -->
+
+    <div class="upload-grid">
+
+        <!-- DOCUMENT -->
+
+        <div class="upload-card">
+
+            <h2>📄 Upload Identity Document</h2>
+
+            <p>
+                Upload a JPG or PNG document for screening
+            </p>
+
+            <input
+                type="file"
+                id="fileInput"
+                accept=".jpg,.jpeg,.png"
+            >
+
+            <div
+                class="file-name"
+                id="documentFileName"
+            ></div>
+
+        </div>
+
+
+        <!-- SELFIE -->
+
+        <div class="upload-card">
+
+            <h2>🤳 Upload Current Selfie</h2>
+
+            <p>
+                Upload a clear selfie for identity verification
+            </p>
+
+            <input
+                type="file"
+                id="selfieInput"
+                accept=".jpg,.jpeg,.png"
+            >
+
+            <div
+                class="file-name"
+                id="selfieFileName"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ANALYZE BUTTON -->
+
+    <div class="analyze-container">
+
+        <button
+            id="analyzeButton"
+            disabled
+        >
+            ANALYZE IDENTITY
+        </button>
+
+    </div>
+
+
+    <!-- LOADING -->
+
+    <div id="loading">
+
+        🔄 Analyzing identity...
+
+    </div>
+
+
+    <!-- RESULT -->
+
+    <div id="result">
+
+
+        <!-- RESULT HEADER -->
+
+        <div class="result-header">
+
+            <div
+                class="status"
+                id="status"
+            >
+            </div>
+
+            <div
+                class="risk-score"
+                id="riskScore"
+            >
+            </div>
+
+        </div>
+
+
+        <!-- RISK ASSESSMENT -->
+
+        <div class="section">
+
+            <h3>⚠️ Risk Assessment</h3>
+
+            <div id="riskFactors"></div>
+
+        </div>
+
+
+        <!-- DOCUMENT DETAILS -->
+
+        <div class="section">
+
+            <h3>📄 Document Details</h3>
+
+            <div class="details-grid">
+
+                <div class="detail">
+                    <strong>Document Type</strong>
+                    <span id="documentType"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Document Number</strong>
+                    <span id="documentNumber"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Name</strong>
+                    <span id="documentName"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Date of Birth</strong>
+                    <span id="dateOfBirth"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Gender</strong>
+                    <span id="gender"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Nationality</strong>
+                    <span id="nationality"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Date of Issue</strong>
+                    <span id="dateOfIssue"></span>
+                </div>
+
+                <div class="detail">
+                    <strong>Date of Expiry</strong>
+                    <span id="dateOfExpiry"></span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- VALIDATION -->
+
+        <div class="section">
+
+            <h3>✓ Validation Check</h3>
+
+            <div id="validation"></div>
+
+        </div>
+
+
+        <!-- TAMPERING -->
+
+        <div class="section">
+
+            <h3>🔍 Tampering Detection</h3>
+
+            <div
+                class="tampering-box"
+                id="tampering"
+            >
+            </div>
+
+        </div>
+
+
+        <!-- FACE VERIFICATION -->
+
+        <div class="section">
+
+            <h3>👤 Face Verification</h3>
+
+            <div id="faceVerification"></div>
+
+        </div>
+
+
+        <!-- OCR -->
+
+        <div class="section">
+
+            <details>
+
+                <summary>
+                    View Extracted OCR Text
+                </summary>
+
+                <pre id="ocrText"></pre>
+
+            </details>
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+<script>
+
+    // =====================================================
+    // ELEMENTS
+    // =====================================================
+
+    const fileInput =
+        document.getElementById("fileInput");
+
+    const selfieInput =
+        document.getElementById("selfieInput");
+
+    const analyzeButton =
+        document.getElementById("analyzeButton");
+
+    const loading =
+        document.getElementById("loading");
+
+    const result =
+        document.getElementById("result");
+
+
+    // =====================================================
+    // FILE SELECTION
+    // =====================================================
+
+    let selectedFile = null;
+    let selectedSelfie = null;
+
+
+    fileInput.addEventListener(
+        "change",
+        function () {
+
+            selectedFile =
+                fileInput.files[0];
+
+            document.getElementById(
+                "documentFileName"
+            ).textContent =
+                selectedFile
+                    ? selectedFile.name
+                    : "";
+
+            updateButton();
+
+        }
+    );
+
+
+    selfieInput.addEventListener(
+        "change",
+        function () {
+
+            selectedSelfie =
+                selfieInput.files[0];
+
+            document.getElementById(
+                "selfieFileName"
+            ).textContent =
+                selectedSelfie
+                    ? selectedSelfie.name
+                    : "";
+
+            updateButton();
+
+        }
+    );
+
+
+    function updateButton() {
+
+        analyzeButton.disabled =
+            !(selectedFile && selectedSelfie);
+
+    }
+
+
+    // =====================================================
+    // ANALYZE
+    // =====================================================
+
+    analyzeButton.addEventListener(
+        "click",
+        async function () {
+
+            if (!selectedFile || !selectedSelfie) {
+
+                alert(
+                    "Please upload both an identity document and a selfie."
+                );
+
+                return;
+
+            }
+
+
+            loading.style.display = "block";
+
+            result.style.display = "none";
+
+            analyzeButton.disabled = true;
+
+
+            try {
+
+                const formData =
+                    new FormData();
+
+
+                formData.append(
+                    "file",
+                    selectedFile
+                );
+
+
+                formData.append(
+                    "selfie",
+                    selectedSelfie
+                );
+
+
+                const response =
+                    await fetch(
+                        "/analyze",
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+
+                if (!response.ok) {
+
+                    const errorText =
+                        await response.text();
+
+                    throw new Error(
+                        errorText ||
+                        "Analysis failed."
+                    );
+
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                displayResults(data);
+
+
+            } catch (error) {
+
+                console.error(
+                    "Analysis error:",
+                    error
+                );
+
+                alert(
+                    "Analysis failed. Check the backend terminal for details."
+                );
+
+            } finally {
+
+                loading.style.display = "none";
+
+                analyzeButton.disabled = false;
+
+            }
+
+        }
+    );
+
+
+    // =====================================================
+    // DISPLAY RESULTS
+    // =====================================================
+
+    function displayResults(data) {
+
+        result.style.display = "block";
+
+
+        // -------------------------------------------------
+        // STATUS
+        // -------------------------------------------------
+
+        document.getElementById(
+            "status"
+        ).textContent =
+            data.status;
+
+
+        document.getElementById(
+            "riskScore"
+        ).textContent =
+            `Risk Score: ${data.risk_score}/100`;
+
+
+        // -------------------------------------------------
+        // RISK FACTORS
+        // -------------------------------------------------
+
+        const riskFactors =
+            document.getElementById(
+                "riskFactors"
+            );
+
+
+        if (
+            data.risk_factors &&
+            data.risk_factors.length > 0
+        ) {
+
+            riskFactors.innerHTML =
+                data.risk_factors
+                    .map(
+                        factor =>
+                            `<div class="risk-factor">⚠️ ${factor}</div>`
+                    )
+                    .join("");
+
+        } else {
+
+            riskFactors.innerHTML =
+                `<div class="validation-ok">
+                    ✓ No significant risk factors detected
+                </div>`;
+
+        }
+
+
+        // -------------------------------------------------
+        // DOCUMENT DETAILS
+        // -------------------------------------------------
+
+        const fields =
+            data.document_fields || {};
+
+
+        setText(
+            "documentType",
+            fields.document_type
+        );
+
+        setText(
+            "documentNumber",
+            fields.document_number
+        );
+
+        setText(
+            "documentName",
+            fields.name
+        );
+
+        setText(
+            "dateOfBirth",
+            fields.date_of_birth
+        );
+
+        setText(
+            "gender",
+            fields.gender
+        );
+
+        setText(
+            "nationality",
+            fields.nationality
+        );
+
+        setText(
+            "dateOfIssue",
+            fields.date_of_issue
+        );
+
+        setText(
+            "dateOfExpiry",
+            fields.date_of_expiry
+        );
+
+
+        // -------------------------------------------------
+        // VALIDATION
+        // -------------------------------------------------
+
+        const validation =
+            document.getElementById(
+                "validation"
+            );
+
+
+        if (
+            data.validation_issues &&
+            data.validation_issues.length > 0
+        ) {
+
+            validation.innerHTML =
+                data.validation_issues
+                    .map(
+                        issue =>
+                            `<div class="risk-factor">⚠️ ${issue}</div>`
+                    )
+                    .join("");
+
+        } else {
+
+            validation.innerHTML =
+                `<div class="validation-ok">
+                    ✓ No validation issues detected
+                </div>`;
+
+        }
+
+
+        // -------------------------------------------------
+        // TAMPERING
+        // -------------------------------------------------
+
+        const tampering =
+            data.tampering || {};
+
+
+        document.getElementById(
+            "tampering"
+        ).innerHTML = `
+
+            <strong>
+                ${tampering.tampering_result || "UNKNOWN"}
+            </strong>
+
+            <br><br>
+
+            Difference Score:
+            ${tampering.difference_score ?? "N/A"}
+
+        `;
+
+
+        // -------------------------------------------------
+        // FACE VERIFICATION
+        // -------------------------------------------------
+
+        displayFaceResults(data);
+
+
+        // -------------------------------------------------
+        // OCR
+        // -------------------------------------------------
+
+        document.getElementById(
+            "ocrText"
+        ).textContent =
+            data.extracted_text ||
+            "No OCR text extracted.";
+
+    }
+
+
+    // =====================================================
+    // FACE RESULTS
+    // =====================================================
+
+    function displayFaceResults(data) {
+
+        const container =
+            document.getElementById(
+                "faceVerification"
+            );
+
+
+        const documentFace =
+            data.face_verification || {};
+
+
+        const selfieFace =
+            data.selfie_face_verification || {};
+
+
+        const faceMatch =
+            data.face_matching || {};
+
+
+        let html = "";
+
+
+        // -------------------------------------------------
+        // DOCUMENT FACE
+        // -------------------------------------------------
+
+        html += `
+
+            <div class="detail">
+
+                <strong>Identity Document Face</strong>
+
+                ${
+                    documentFace.face_detected
+                        ? "✓ Face detected successfully"
+                        : "✕ No face detected"
+                }
+
+                <br>
+
+                Faces Detected:
+                ${documentFace.face_count ?? 0}
+
+            </div>
+
+        `;
+
+
+        // -------------------------------------------------
+        // SELFIE FACE
+        // -------------------------------------------------
+
+        html += `
+
+            <div
+                class="detail"
+                style="margin-top: 12px;"
+            >
+
+                <strong>Current Selfie</strong>
+
+                ${
+                    selfieFace.face_detected
+                        ? "✓ Human face detected"
+                        : "✕ No human face detected"
+                }
+
+                <br>
+
+                Faces Detected:
+                ${selfieFace.face_count ?? 0}
+
+            </div>
+
+        `;
+
+
+        // -------------------------------------------------
+        // FACE MATCH
+        // -------------------------------------------------
+
+        if (
+            documentFace.face_detected &&
+            selfieFace.face_detected
+        ) {
+
+            const similarity =
+                Number(
+                    faceMatch.similarity_score || 0
+                );
+
+
+            const percentage =
+                similarity * 100;
+
+
+            const threshold =
+                Number(
+                    faceMatch.threshold || 0
+                );
+
+
+            const thresholdPercentage =
+                threshold * 100;
+
+
+            if (faceMatch.match) {
+
+                html += `
+
+                    <div
+                        class="face-match-success"
+                        style="margin-top: 15px;"
+                    >
+
+                        <div class="match-title">
+                            ✓ FACE MATCH
+                        </div>
+
+                        <div>
+                            Identity document and
+                            selfie appear to belong
+                            to the same person.
+                        </div>
+
+                        <div class="match-score">
+                            Similarity Score:
+                            <strong>
+                                ${percentage.toFixed(2)}%
+                            </strong>
+                        </div>
+
+                        <div class="match-score">
+                            Matching Threshold:
+                            <strong>
+                                ${thresholdPercentage.toFixed(1)}%
+                            </strong>
+                        </div>
+
+                        <div class="score-bar">
+
+                            <div
+                                class="score-fill"
+                                style="width:${Math.min(
+                                    percentage,
+                                    100
+                                )}%"
+                            >
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            } else {
+
+                html += `
+
+                    <div
+                        class="face-match-warning"
+                        style="margin-top: 15px;"
+                    >
+
+                        <div class="match-title">
+                            ✕ FACE MISMATCH
+                        </div>
+
+                        <div>
+                            Identity document face
+                            does not match the
+                            current selfie.
+                        </div>
+
+                        <div class="match-score">
+                            Similarity Score:
+                            <strong>
+                                ${percentage.toFixed(2)}%
+                            </strong>
+                        </div>
+
+                        <div class="match-score">
+                            Matching Threshold:
+                            <strong>
+                                ${thresholdPercentage.toFixed(1)}%
+                            </strong>
+                        </div>
+
+                        <div class="score-bar">
+
+                            <div
+                                class="score-fill"
+                                style="width:${Math.min(
+                                    percentage,
+                                    100
+                                )}%"
+                            >
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            }
+
+        } else {
+
+            // -------------------------------------------------
+            // NO FACE → MATCHING NOT PERFORMED
+            // -------------------------------------------------
+
+            html += `
+
+                <div
+                    class="face-match-neutral"
+                    style="margin-top: 15px;"
+                >
+
+                    <div class="match-title">
+                        Face Matching Not Performed
+                    </div>
+
+                    <div>
+                        A valid human face must be
+                        detected in both the identity
+                        document and current selfie.
+                    </div>
+
+                </div>
+
+            `;
+
+        }
+
+
+        container.innerHTML =
+            html;
+
+    }
+
+
+    // =====================================================
+    // HELPER
+    // =====================================================
+
+    function setText(
+        elementId,
+        value
+    ) {
+
+        document.getElementById(
+            elementId
+        ).textContent =
+            value ||
+            "Not detected";
+
+    }
+
+</script>
+
+</body>
+
+</html>

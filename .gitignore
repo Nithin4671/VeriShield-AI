@@ -1,0 +1,21 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Environment variables / secrets
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Uploaded identity documents and selfies
+uploads/*
+!uploads/.gitkeep
+
+# IDE files
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

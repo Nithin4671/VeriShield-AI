@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
 import shutil
-import pytesseract
+
 
 from backend.ocr import extract_text
 from backend.validator import extract_fields, validate_fields

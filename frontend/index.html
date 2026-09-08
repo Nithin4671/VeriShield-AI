@@ -106,6 +106,75 @@
             cursor: not-allowed;
         }
 
+        .phone-card {
+            background: white;
+            border-radius: 14px;
+            padding: 25px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 25px;
+        }
+
+        .phone-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .phone-row input {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        .phone-row button {
+            white-space: nowrap;
+        }
+
+        .otp-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .otp-row input {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+            letter-spacing: 3px;
+        }
+
+        .verification-status {
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .verification-status.pending {
+            color: #b45309;
+        }
+
+        .verification-status.success {
+            color: #047857;
+        }
+
+        .verification-status.error {
+            color: #b91c1c;
+        }
+
+        @media (max-width: 700px) {
+            .phone-row,
+            .otp-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
         #loading {
             display: none;
             text-align: center;
@@ -303,7 +372,7 @@
 
         <div class="upload-card">
 
-            <h2>📄 Upload Identity Document</h2>
+            <h2> Upload Identity Document</h2>
 
             <p>
                 Upload a JPG or PNG document for screening
@@ -327,23 +396,83 @@
 
         <div class="upload-card">
 
-            <h2>🤳 Upload Current Selfie</h2>
+            <h2>Live Selfie Verification</h2>
 
             <p>
-                Upload a clear selfie for identity verification
+                Use your camera to capture a live selfie
             </p>
 
+            <video id="cameraPreview" autoplay playsinline muted style="display:none; width:100%; margin-top:15px; border-radius:10px; background:#111827;"></video>
+            <canvas id="cameraCanvas" style="display:none;"></canvas>
+
+            <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                <button type="button" id="startCameraButton">START CAMERA</button>
+                <button type="button" id="captureSelfieButton" style="display:none;">CAPTURE SELFIE</button>
+                <button type="button" id="retakeSelfieButton" style="display:none;">RETAKE</button>
+            </div>
+
+            <div class="file-name" id="selfieFileName"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- PHONE VERIFICATION -->
+
+    <div class="phone-card">
+
+        <h2>📱 Phone Verification</h2>
+
+        <p>
+            Verify the user's mobile number with a one-time password before identity analysis.
+        </p>
+
+        <div class="phone-row">
+
             <input
-                type="file"
-                id="selfieInput"
-                accept=".jpg,.jpeg,.png"
+                type="tel"
+                id="mobileInput"
+                maxlength="10"
+                inputmode="numeric"
+                placeholder="Enter 10-digit mobile number"
             >
 
-            <div
-                class="file-name"
-                id="selfieFileName"
-            ></div>
+            <button
+                type="button"
+                id="sendOtpButton"
+            >
+                SEND OTP
+            </button>
 
+        </div>
+
+        <div class="otp-row">
+
+            <input
+                type="text"
+                id="otpInput"
+                maxlength="6"
+                inputmode="numeric"
+                placeholder="Enter 6-digit OTP"
+                disabled
+            >
+
+            <button
+                type="button"
+                id="verifyOtpButton"
+                disabled
+            >
+                VERIFY OTP
+            </button>
+
+        </div>
+
+        <div
+            id="phoneVerificationStatus"
+            class="verification-status pending"
+        >
+            Phone verification required before analysis.
         </div>
 
     </div>
@@ -528,11 +657,38 @@
     const fileInput =
         document.getElementById("fileInput");
 
-    const selfieInput =
-        document.getElementById("selfieInput");
+    const cameraPreview =
+        document.getElementById("cameraPreview");
+
+    const cameraCanvas =
+        document.getElementById("cameraCanvas");
+
+    const startCameraButton =
+        document.getElementById("startCameraButton");
+
+    const captureSelfieButton =
+        document.getElementById("captureSelfieButton");
+
+    const retakeSelfieButton =
+        document.getElementById("retakeSelfieButton");
 
     const analyzeButton =
         document.getElementById("analyzeButton");
+
+    const mobileInput =
+        document.getElementById("mobileInput");
+
+    const otpInput =
+        document.getElementById("otpInput");
+
+    const sendOtpButton =
+        document.getElementById("sendOtpButton");
+
+    const verifyOtpButton =
+        document.getElementById("verifyOtpButton");
+
+    const phoneVerificationStatus =
+        document.getElementById("phoneVerificationStatus");
 
     const loading =
         document.getElementById("loading");
@@ -547,6 +703,9 @@
 
     let selectedFile = null;
     let selectedSelfie = null;
+    let cameraStream = null;
+    let phoneVerified = false;
+    let otpSent = false;
 
 
     fileInput.addEventListener(
@@ -569,30 +728,258 @@
     );
 
 
-    selfieInput.addEventListener(
-        "change",
-        function () {
+    startCameraButton.addEventListener("click", async function () {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+                audio: false
+            });
+            cameraPreview.srcObject = cameraStream;
+            cameraPreview.style.display = "block";
+            startCameraButton.style.display = "none";
+            captureSelfieButton.style.display = "inline-block";
+            retakeSelfieButton.style.display = "none";
+            document.getElementById("selfieFileName").textContent = "Camera ready — capture your selfie.";
+        } catch (error) {
+            console.error("Camera error:", error);
+            alert("Camera access was denied or is unavailable. Please allow camera access and try again.");
+        }
+    });
 
-            selectedSelfie =
-                selfieInput.files[0];
+    captureSelfieButton.addEventListener("click", function () {
+        if (!cameraStream) { alert("Please start the camera first."); return; }
+        const width = cameraPreview.videoWidth;
+        const height = cameraPreview.videoHeight;
+        if (!width || !height) { alert("Camera is still loading. Please try again."); return; }
+        cameraCanvas.width = width;
+        cameraCanvas.height = height;
+        const context = cameraCanvas.getContext("2d");
+        context.drawImage(cameraPreview, 0, 0, width, height);
+        cameraCanvas.toBlob(function (blob) {
+            if (!blob) { alert("Could not capture the selfie."); return; }
+            selectedSelfie = new File([blob], "live-selfie.jpg", { type: "image/jpeg" });
+            document.getElementById("selfieFileName").textContent = "✓ Live selfie captured successfully.";
+            captureSelfieButton.style.display = "none";
+            retakeSelfieButton.style.display = "inline-block";
+            updateButton();
+        }, "image/jpeg", 0.92);
+    });
 
-            document.getElementById(
-                "selfieFileName"
-            ).textContent =
-                selectedSelfie
-                    ? selectedSelfie.name
-                    : "";
+    retakeSelfieButton.addEventListener("click", function () {
+        selectedSelfie = null;
+        cameraPreview.style.display = "block";
+        captureSelfieButton.style.display = "inline-block";
+        retakeSelfieButton.style.display = "none";
+        document.getElementById("selfieFileName").textContent = "Camera ready — capture your selfie.";
+        updateButton();
+    });
+
+    function stopCamera() {
+        if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; }
+    }
+
+    window.addEventListener("beforeunload", stopCamera);
+
+
+    // =====================================================
+    // PHONE VERIFICATION
+    // =====================================================
+
+    mobileInput.addEventListener("input", function () {
+
+        this.value = this.value.replace(/\D/g, "").slice(0, 10);
+
+        phoneVerified = false;
+        otpSent = false;
+
+        otpInput.value = "";
+        otpInput.disabled = true;
+        verifyOtpButton.disabled = true;
+
+        setPhoneStatus(
+            "Phone verification required before analysis.",
+            "pending"
+        );
+
+        updateButton();
+
+    });
+
+
+    sendOtpButton.addEventListener("click", async function () {
+
+        const mobile = mobileInput.value.trim();
+
+        if (!/^\d{10}$/.test(mobile)) {
+
+            setPhoneStatus(
+                "Please enter a valid 10-digit mobile number.",
+                "error"
+            );
+
+            return;
+        }
+
+        sendOtpButton.disabled = true;
+        sendOtpButton.textContent = "SENDING...";
+
+        try {
+
+            const response = await fetch(
+                "/send-otp",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        mobile: mobile
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.message || "Unable to send OTP."
+                );
+            }
+
+            otpSent = true;
+
+            otpInput.disabled = false;
+            verifyOtpButton.disabled = false;
+            otpInput.focus();
+
+            setPhoneStatus(
+                "OTP generated. Enter the OTP from the backend terminal.",
+                "pending"
+            );
+
+        } catch (error) {
+
+            console.error(
+                "OTP send error:",
+                error
+            );
+
+            setPhoneStatus(
+                error.message || "Unable to send OTP.",
+                "error"
+            );
+
+        } finally {
+
+            sendOtpButton.disabled = false;
+            sendOtpButton.textContent = "SEND OTP";
+
+        }
+
+    });
+
+
+    verifyOtpButton.addEventListener("click", async function () {
+
+        const mobile = mobileInput.value.trim();
+        const otp = otpInput.value.trim();
+
+        if (!/^\d{10}$/.test(mobile)) {
+
+            setPhoneStatus(
+                "Please enter a valid 10-digit mobile number.",
+                "error"
+            );
+
+            return;
+        }
+
+        if (!/^\d{6}$/.test(otp)) {
+
+            setPhoneStatus(
+                "Please enter the 6-digit OTP.",
+                "error"
+            );
+
+            return;
+        }
+
+        verifyOtpButton.disabled = true;
+        verifyOtpButton.textContent = "VERIFYING...";
+
+        try {
+
+            const response = await fetch(
+                "/verify-otp",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        mobile: mobile,
+                        otp: otp
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.message || "OTP verification failed."
+                );
+            }
+
+            phoneVerified = true;
+
+            setPhoneStatus(
+                "✓ Phone number verified successfully.",
+                "success"
+            );
+
+            otpInput.disabled = true;
+            verifyOtpButton.textContent = "VERIFIED ✓";
+
+            updateButton();
+
+        } catch (error) {
+
+            console.error(
+                "OTP verification error:",
+                error
+            );
+
+            phoneVerified = false;
+
+            setPhoneStatus(
+                error.message || "Incorrect or expired OTP.",
+                "error"
+            );
+
+            verifyOtpButton.disabled = false;
+            verifyOtpButton.textContent = "VERIFY OTP";
 
             updateButton();
 
         }
-    );
+
+    });
+
+
+    function setPhoneStatus(message, type) {
+
+        phoneVerificationStatus.textContent = message;
+        phoneVerificationStatus.className =
+            "verification-status " + type;
+
+    }
 
 
     function updateButton() {
 
         analyzeButton.disabled =
-            !(selectedFile && selectedSelfie);
+            !(selectedFile && selectedSelfie && phoneVerified);
 
     }
 
@@ -605,10 +992,10 @@
         "click",
         async function () {
 
-            if (!selectedFile || !selectedSelfie) {
+            if (!selectedFile || !selectedSelfie || !phoneVerified) {
 
                 alert(
-                    "Please upload both an identity document and a selfie."
+                    "Please upload the identity document, verify the phone number, and capture a live selfie."
                 );
 
                 return;

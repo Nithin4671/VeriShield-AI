@@ -1,7 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
-from pathlib import Path
+import os
 import shutil
+from pathlib import Path
+
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from backend.ocr import extract_text
 from backend.validator import extract_fields, validate_fields
@@ -9,44 +12,51 @@ from backend.tampering import detect_tampering
 from backend.face_verification import detect_face
 from backend.face_matching import match_faces
 
+from backend.otp import (
+    send_otp,
+    verify_otp,
+    is_phone_verified
+)
 
 
-
-
-# ============================================================
-# FASTAPI APP
-# ============================================================
+# =====================================================
+# APP CONFIGURATION
+# =====================================================
 
 app = FastAPI(
     title="VeriShield AI",
     description="AI-Based Fake Identity & Document Screening System",
-    version="1.0.0"
+    version="1.0"
 )
 
 
-# ============================================================
-# UPLOAD DIRECTORY
-# ============================================================
+# =====================================================
+# DIRECTORIES
+# =====================================================
 
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.abspath(__file__)
+        )
+    )
+)
+
+UPLOAD_DIR = BASE_DIR / "uploads"
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+UPLOAD_DIR.mkdir(
+    exist_ok=True
+)
 
 
-# ============================================================
-# FRONTEND
-# ============================================================
-
-@app.get("/app")
-def frontend():
-    return FileResponse("frontend/index.html")
-
-
-# ============================================================
-# HOME
-# ============================================================
+# =====================================================
+# ROOT
+# =====================================================
 
 @app.get("/")
-def home():
+async def root():
+
     return {
         "message": "VeriShield AI is running!",
         "project": "AI-Based Fake Identity & Document Screening System",
@@ -54,45 +64,145 @@ def home():
     }
 
 
-# ============================================================
-# SIMPLE UPLOAD ENDPOINT
-# ============================================================
+# =====================================================
+# FRONTEND
+# =====================================================
 
-@app.post("/upload")
-async def upload_document(
-    file: UploadFile = File(...)
+@app.get("/app")
+async def serve_frontend():
+
+    return FileResponse(
+        FRONTEND_DIR / "index.html"
+    )
+
+
+# =====================================================
+# OTP MODELS
+# =====================================================
+
+class OTPRequest(BaseModel):
+    mobile: str
+
+
+class OTPVerifyRequest(BaseModel):
+    mobile: str
+    otp: str
+
+
+# =====================================================
+# SEND DEMO OTP
+# =====================================================
+
+@app.post("/send-otp")
+async def send_otp_endpoint(
+    request: OTPRequest
 ):
 
-    allowed_types = {
-        "image/jpeg",
-        "image/png"
-    }
+    mobile = request.mobile.strip()
 
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail="Only JPG and PNG files are allowed."
+    # Validate Indian 10-digit mobile number
+    if not mobile.isdigit() or len(mobile) != 10:
+
+        return {
+            "success": False,
+            "message": (
+                "Please enter a valid "
+                "10-digit mobile number."
+            )
+        }
+
+    print()
+    print(
+        "============================================================"
+    )
+    print("                 VERISHIELD DEMO OTP")
+    print(
+        "============================================================"
+    )
+    print(
+        f"Mobile Number : {mobile}"
+    )
+
+    result = send_otp(mobile)
+
+    print(
+        "============================================================"
+    )
+    print()
+
+    return result
+
+
+# =====================================================
+# VERIFY DEMO OTP
+# =====================================================
+
+@app.post("/verify-otp")
+async def verify_otp_endpoint(
+    request: OTPVerifyRequest
+):
+
+    mobile = request.mobile.strip()
+    otp = request.otp.strip()
+
+    # Validate mobile
+    if not mobile.isdigit() or len(mobile) != 10:
+
+        return {
+            "success": False,
+            "message": (
+                "Please enter a valid "
+                "10-digit mobile number."
+            )
+        }
+
+    # Validate OTP
+    if not otp.isdigit() or len(otp) != 6:
+
+        return {
+            "success": False,
+            "message": (
+                "Please enter a valid "
+                "6-digit OTP."
+            )
+        }
+
+    result = verify_otp(
+        mobile,
+        otp
+    )
+
+    if result.get("success"):
+
+        print(
+            f"✓ Phone number verified: {mobile}"
         )
 
-    file_path = UPLOAD_DIR / file.filename
+    return result
 
-    with file_path.open("wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
+
+# =====================================================
+# PHONE VERIFICATION STATUS
+# =====================================================
+
+@app.post("/phone-status")
+async def phone_status(
+    request: OTPRequest
+):
+
+    mobile = request.mobile.strip()
 
     return {
-        "message": "Document uploaded successfully",
-        "filename": file.filename,
-        "file_type": file.content_type,
-        "status": "Ready for analysis"
+        "mobile": mobile,
+        "verified": is_phone_verified(
+            mobile
+        )
     }
 
 
-# ============================================================
-# IDENTITY ANALYSIS
-# ============================================================
+# =====================================================
+# ANALYZE DOCUMENT
+# =====================================================
 
 @app.post("/analyze")
 async def analyze_document(
@@ -100,87 +210,92 @@ async def analyze_document(
     selfie: UploadFile = File(...)
 ):
 
-    print("\n")
-    print("=" * 60)
-    print("             VERISHIELD AI ANALYSIS")
-    print("=" * 60)
+    print()
+    print(
+        "============================================================"
+    )
+    print("              VERISHIELD AI ANALYSIS")
+    print(
+        "============================================================"
+    )
 
+    # -------------------------------------------------
+    # FILE PATHS
+    # -------------------------------------------------
 
-    # ========================================================
-    # FILE VALIDATION
-    # ========================================================
+    document_path = (
+        UPLOAD_DIR /
+        file.filename
+    )
 
-    allowed_types = {
-        "image/jpeg",
-        "image/png"
-    }
+    selfie_path = (
+        UPLOAD_DIR /
+        selfie.filename
+    )
 
-    if file.content_type not in allowed_types:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Identity document must be a JPG or PNG image."
-        )
-
-    if selfie.content_type not in allowed_types:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Selfie must be a JPG or PNG image."
-        )
-
-
-    # ========================================================
+    # -------------------------------------------------
     # SAVE IDENTITY DOCUMENT
-    # ========================================================
+    # -------------------------------------------------
 
-    print("\n[0] Saving identity document...")
+    print(
+        "[0] Saving identity document..."
+    )
 
-    file_path = UPLOAD_DIR / file.filename
+    with open(
+        document_path,
+        "wb"
+    ) as buffer:
 
-    with file_path.open("wb") as buffer:
         shutil.copyfileobj(
             file.file,
             buffer
         )
 
-    print("[0] Identity document saved.")
+    print(
+        "[0] Identity document saved."
+    )
 
-
-    # ========================================================
+    # -------------------------------------------------
     # SAVE SELFIE
-    # ========================================================
+    # -------------------------------------------------
 
-    print("[0] Saving selfie...")
+    print(
+        "[0] Saving selfie..."
+    )
 
-    selfie_path = UPLOAD_DIR / selfie.filename
+    with open(
+        selfie_path,
+        "wb"
+    ) as buffer:
 
-    with selfie_path.open("wb") as buffer:
         shutil.copyfileobj(
             selfie.file,
             buffer
         )
 
-    print("[0] Selfie saved.")
+    print(
+        "[0] Selfie saved."
+    )
 
+    # =================================================
+    # 1. OCR
+    # =================================================
 
-    # ========================================================
-    # OCR
-    # ========================================================
-
-    print("\n[1] Starting OCR...")
+    print()
+    print(
+        "[1] Starting OCR..."
+    )
 
     try:
 
         extracted_text = extract_text(
-            str(file_path)
+            str(document_path)
         )
 
     except Exception as e:
 
         print(
-            "[1] OCR ERROR:",
-            str(e)
+            f"[1] OCR ERROR: {str(e)}"
         )
 
         extracted_text = ""
@@ -194,12 +309,14 @@ async def analyze_document(
         f"{len(extracted_text)}"
     )
 
+    # =================================================
+    # 2. DOCUMENT FIELD EXTRACTION
+    # =================================================
 
-    # ========================================================
-    # DOCUMENT FIELD EXTRACTION
-    # ========================================================
-
-    print("\n[2] Extracting document fields...")
+    print()
+    print(
+        "[2] Extracting document fields..."
+    )
 
     try:
 
@@ -210,8 +327,8 @@ async def analyze_document(
     except Exception as e:
 
         print(
-            "[2] FIELD EXTRACTION ERROR:",
-            str(e)
+            f"[2] FIELD EXTRACTION ERROR: "
+            f"{str(e)}"
         )
 
         fields = {
@@ -226,16 +343,17 @@ async def analyze_document(
         }
 
     print(
-        "[2] Fields:",
-        fields
+        f"[2] Fields: {fields}"
     )
 
+    # =================================================
+    # 3. VALIDATION
+    # =================================================
 
-    # ========================================================
-    # VALIDATION
-    # ========================================================
-
-    print("\n[3] Validating document...")
+    print()
+    print(
+        "[3] Validating document..."
+    )
 
     try:
 
@@ -246,87 +364,92 @@ async def analyze_document(
     except Exception as e:
 
         print(
-            "[3] VALIDATION ERROR:",
-            str(e)
+            f"[3] VALIDATION ERROR: "
+            f"{str(e)}"
         )
 
         validation_issues = [
-            "Unable to validate document"
+            f"Validation failed: {str(e)}"
         ]
 
     print(
-        "[3] Validation:",
-        validation_issues
+        f"[3] Validation: "
+        f"{validation_issues}"
     )
 
+    # =================================================
+    # 4. TAMPERING DETECTION
+    # =================================================
 
-    # ========================================================
-    # TAMPERING DETECTION
-    # ========================================================
-
-    print("\n[4] Starting tampering detection...")
+    print()
+    print(
+        "[4] Starting tampering detection..."
+    )
 
     try:
 
         tampering = detect_tampering(
-            str(file_path)
+            str(document_path)
         )
 
     except Exception as e:
 
         print(
-            "[4] TAMPERING ERROR:",
-            str(e)
+            f"[4] TAMPERING ERROR: "
+            f"{str(e)}"
         )
 
         tampering = {
             "tampering_result": "UNKNOWN",
             "difference_score": 0,
-            "message": "Unable to perform tampering analysis"
+            "message": str(e)
         }
 
     print(
-        "[4] Tampering:",
-        tampering
+        f"[4] Tampering: {tampering}"
     )
 
+    # =================================================
+    # 5. FACE DETECTION — ID
+    # =================================================
 
-    # ========================================================
-    # FACE DETECTION - ID DOCUMENT
-    # ========================================================
-
-    print("\n[5] Detecting face on identity document...")
+    print()
+    print(
+        "[5] Detecting face on identity document..."
+    )
 
     try:
 
-        face_result = detect_face(
-            str(file_path)
+        id_face_result = detect_face(
+            str(document_path)
         )
 
     except Exception as e:
 
         print(
-            "[5] ID FACE DETECTION ERROR:",
-            str(e)
+            f"[5] ID FACE ERROR: "
+            f"{str(e)}"
         )
 
-        face_result = {
+        id_face_result = {
             "face_detected": False,
             "face_count": 0,
-            "message": "Unable to detect face"
+            "message": str(e)
         }
 
     print(
-        "[5] ID face result:",
-        face_result
+        f"[5] ID face result: "
+        f"{id_face_result}"
     )
 
+    # =================================================
+    # 6. FACE DETECTION — SELFIE
+    # =================================================
 
-    # ========================================================
-    # FACE DETECTION - SELFIE
-    # ========================================================
-
-    print("\n[6] Detecting face in current selfie...")
+    print()
+    print(
+        "[6] Detecting face in current selfie..."
+    )
 
     try:
 
@@ -337,115 +460,80 @@ async def analyze_document(
     except Exception as e:
 
         print(
-            "[6] SELFIE FACE DETECTION ERROR:",
-            str(e)
+            f"[6] SELFIE FACE ERROR: "
+            f"{str(e)}"
         )
 
         selfie_face_result = {
             "face_detected": False,
             "face_count": 0,
-            "message": "Unable to detect face"
+            "message": str(e)
         }
 
     print(
-        "[6] Selfie face result:",
-        selfie_face_result
+        f"[6] Selfie face result: "
+        f"{selfie_face_result}"
     )
 
+    # =================================================
+    # 7. FACE MATCHING
+    # =================================================
 
-    # ========================================================
-    # FACE MATCHING
-    # ========================================================
-
-    print("\n[7] Starting face matching...")
+    print()
+    print(
+        "[7] Starting face matching..."
+    )
 
     try:
 
-        if (
-            face_result.get("face_detected", False)
-            and
-            selfie_face_result.get("face_detected", False)
-        ):
-
-            face_match_result = match_faces(
-                str(file_path),
-                str(selfie_path)
-            )
-
-        else:
-
-            print(
-                "[7] Face matching skipped."
-            )
-
-            face_match_result = {
-                "match": False,
-                "similarity_score": 0,
-                "threshold": 0.363,
-                "message": (
-                    "Face matching not performed "
-                    "because a valid face was not "
-                    "detected in both images."
-                ),
-                "id_faces_detected": face_result.get(
-                    "face_count",
-                    0
-                ),
-                "selfie_faces_detected": selfie_face_result.get(
-                    "face_count",
-                    0
-                )
-            }
+        face_match_result = match_faces(
+            str(document_path),
+            str(selfie_path)
+        )
 
     except Exception as e:
 
         print(
-            "[7] FACE MATCHING ERROR:",
-            str(e)
+            f"[7] FACE MATCHING ERROR: "
+            f"{str(e)}"
         )
 
         face_match_result = {
             "match": False,
             "similarity_score": 0,
             "threshold": 0.363,
-            "message": (
-                "Unable to perform face matching"
-            ),
-            "id_faces_detected": face_result.get(
-                "face_count",
-                0
-            ),
-            "selfie_faces_detected": selfie_face_result.get(
-                "face_count",
-                0
-            )
+            "message": str(e),
+            "id_faces_detected": 0,
+            "selfie_faces_detected": 0
         }
 
     print(
-        "[7] Face matching complete:"
+        f"[7] Face matching complete:"
     )
 
     print(
         face_match_result
     )
 
+    # =================================================
+    # 8. RISK SCORING
+    # =================================================
 
-    # ========================================================
-    # RISK SCORING
-    # ========================================================
-
-    print("\n[8] Calculating risk score...")
+    print()
+    print(
+        "[8] Calculating risk score..."
+    )
 
     risk_score = 0
-
     risk_factors = []
 
+    # -------------------------------------------------
+    # UNKNOWN DOCUMENT
+    # -------------------------------------------------
 
-    # --------------------------------------------------------
-    # DOCUMENT TYPE
-    # --------------------------------------------------------
-
-    if fields.get("document_type") == "UNKNOWN":
+    if fields.get(
+        "document_type"
+    ) == "UNKNOWN":
 
         risk_score += 10
 
@@ -453,10 +541,9 @@ async def analyze_document(
             "Unable to identify document type"
         )
 
-
-    # --------------------------------------------------------
+    # -------------------------------------------------
     # VALIDATION ISSUES
-    # --------------------------------------------------------
+    # -------------------------------------------------
 
     for issue in validation_issues:
 
@@ -466,42 +553,36 @@ async def analyze_document(
             issue
         )
 
-
-    # --------------------------------------------------------
+    # -------------------------------------------------
     # TAMPERING
-    # --------------------------------------------------------
+    # -------------------------------------------------
 
-    tampering_result = str(
-        tampering.get(
-            "tampering_result",
-            "UNKNOWN"
-        )
-    ).upper()
-
+    tampering_result = tampering.get(
+        "tampering_result",
+        "UNKNOWN"
+    )
 
     if tampering_result == "SUSPICIOUS":
 
         risk_score += 30
 
         risk_factors.append(
-            "Suspicious signs of document tampering"
+            "Suspicious tampering indicators detected"
         )
-
 
     elif tampering_result == "HIGH RISK":
 
         risk_score += 60
 
         risk_factors.append(
-            "High-risk document tampering detected"
+            "High-risk tampering indicators detected"
         )
 
+    # -------------------------------------------------
+    # ID FACE
+    # -------------------------------------------------
 
-    # --------------------------------------------------------
-    # ID FACE MISSING
-    # --------------------------------------------------------
-
-    if not face_result.get(
+    if not id_face_result.get(
         "face_detected",
         False
     ):
@@ -512,10 +593,9 @@ async def analyze_document(
             "No face detected on identity document"
         )
 
-
-    # --------------------------------------------------------
-    # SELFIE FACE MISSING
-    # --------------------------------------------------------
+    # -------------------------------------------------
+    # SELFIE FACE
+    # -------------------------------------------------
 
     if not selfie_face_result.get(
         "face_detected",
@@ -525,26 +605,23 @@ async def analyze_document(
         risk_score += 20
 
         risk_factors.append(
-            "No human face detected in current selfie"
+            "No face detected in current selfie"
         )
 
-
-    # --------------------------------------------------------
+    # -------------------------------------------------
     # FACE MISMATCH
-    # --------------------------------------------------------
+    # -------------------------------------------------
 
     if (
-        face_match_result.get(
-            "id_faces_detected",
-            0
-        ) > 0
-
+        id_face_result.get(
+            "face_detected",
+            False
+        )
         and
-
-        face_match_result.get(
-            "selfie_faces_detected",
-            0
-        ) > 0
+        selfie_face_result.get(
+            "face_detected",
+            False
+        )
     ):
 
         if not face_match_result.get(
@@ -555,24 +632,21 @@ async def analyze_document(
             risk_score += 40
 
             risk_factors.append(
-                "Identity document face does not "
-                "match current selfie"
+                "Identity document face does not match selfie"
             )
 
-
-    # ========================================================
-    # LIMIT SCORE
-    # ========================================================
+    # -------------------------------------------------
+    # CAP SCORE
+    # -------------------------------------------------
 
     risk_score = min(
-        risk_score,
-        100
+        100,
+        risk_score
     )
 
-
-    # ========================================================
+    # =================================================
     # FINAL STATUS
-    # ========================================================
+    # =================================================
 
     if risk_score >= 60:
 
@@ -586,22 +660,13 @@ async def analyze_document(
 
         final_status = "VERIFIED"
 
+    # =================================================
+    # LOG RESULTS
+    # =================================================
 
-    # ========================================================
-    # CLEAN RISK FACTORS
-    # ========================================================
-
-    # Remove duplicates while preserving order
-
-    risk_factors = list(
-        dict.fromkeys(
-            risk_factors
-        )
-    )
-
-
+    print()
     print(
-        f"\n[8] Risk Score: "
+        f"[8] Risk Score: "
         f"{risk_score}/100"
     )
 
@@ -611,21 +676,23 @@ async def analyze_document(
     )
 
     print(
-        "[8] Risk Factors:",
-        risk_factors
+        f"[8] Risk Factors: "
+        f"{risk_factors}"
     )
 
+    print()
+    print(
+        "============================================================"
+    )
+    print("                  ANALYSIS COMPLETE")
+    print(
+        "============================================================"
+    )
+    print()
 
-    # ========================================================
-    # FINAL RESPONSE
-    # ========================================================
-
-    print("\n")
-    print("=" * 60)
-    print("             ANALYSIS COMPLETE")
-    print("=" * 60)
-    print("\n")
-
+    # =================================================
+    # RESPONSE
+    # =================================================
 
     return {
 
@@ -641,11 +708,12 @@ async def analyze_document(
 
         "tampering": tampering,
 
-        "face_verification": face_result,
+        "face_verification": id_face_result,
 
         "selfie_face_verification": selfie_face_result,
 
         "face_matching": face_match_result,
 
         "extracted_text": extracted_text
+
     }
